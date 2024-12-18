@@ -187,13 +187,13 @@ def execute_openai_request(request: Request, model: str, client: openai.Client) 
 
     
     try:
-        logger.debug("Issusing a new request...")
+        logger.debug(f"Issusing a new request... max tokens={request.max_tokens}")
         chat_completion = client.chat.completions.create(
                 messages = messages,
                 model = model,
                 temperature = 0,
                 stream = True,
-                max_tokens = 200,
+                max_tokens = request.max_tokens,
             )
 
         start_time = time.perf_counter()
@@ -211,9 +211,9 @@ def execute_openai_request(request: Request, model: str, client: openai.Client) 
 
         ttft = first_token_time - start_time
         throughput = ntokens / (end_time - first_token_time)
-        logger.debug(f"Response: {''.join(messages)}")
+        logger.debug(f"Response: {''.join(messages)} end_time: {end_time- start_time}")
     except Exception as e:
-        logger.error(f"OpenAI request failed: {e}")
+        logger.error(f"OpenAI request failed: {e} ")
         return -1, -1
 
     return ttft, throughput
@@ -243,7 +243,7 @@ def execute_openai_request_with_output(request: Request, model: str, client: ope
                 }
             ])
     try:
-        logger.debug("Issusing a new request...")
+        logger.debug("Issusing a new request OPENAI!!!!!...")
         chat_completion = client.chat.completions.create(
                 messages = messages,
                 model = model,

@@ -246,11 +246,11 @@ def test_lmcache_local_disk(model = "mistralai/Mistral-7B-Instruct-v0.2") -> pd.
     """
     # Start two servers: with lmcache and without lmcache
     config1 = CreateSingleLocalBootstrapConfig(8000, 0, model, "configs/lmcache_local_disk.yaml")
-    config2 = CreateSingleLocalBootstrapConfig(8001, 1, model, None)
+    # config2 = CreateSingleLocalBootstrapConfig(8001, 1, model, None)
 
     # Set vllm configuration for different models
     ModelConfig(model, config1)
-    ModelConfig(model, config2)
+    # ModelConfig(model, config2)
 
     # Experiments: 8K, 16K, 24K shared context, each experiments has 5 queries
     lengths = [8192, 16384, 24576]
@@ -258,7 +258,7 @@ def test_lmcache_local_disk(model = "mistralai/Mistral-7B-Instruct-v0.2") -> pd.
 
     test_case = TestCase(
             experiments = experiments,
-            engines = [config1, config2])
+            engines = [config1])
 
     # Run test case
     final_result = run_test_case(test_case)
@@ -295,20 +295,20 @@ def test_lmcache_remote_cachegen(model = "mistralai/Mistral-7B-Instruct-v0.2") -
     by comparing scenarios whether retrieval is pipelined or not.
     """
     # Start two servers
-    config1 = CreateSingleLocalBootstrapConfig(8000, 0, model, "configs/lmcache_remote_cachegen.yaml")
-    config2 = CreateSingleLocalBootstrapConfig(8001, 1, model, "configs/lmcache_remote_cachegen_pipeline.yaml")
+    config1 = CreateSingleLocalBootstrapConfig(8005, 0, model, "configs/lmcache_remote_cachegen.yaml")
+    # config2 = CreateSingleLocalBootstrapConfig(8006, 1, model, "configs/lmcache_remote_cachegen_pipeline.yaml")
 
     # Set vllm configuration for different models
     ModelConfig(model, config1)
-    ModelConfig(model, config2)
+    # ModelConfig(model, config2)
     
     # Experiments: 8K, 16K, 24K shared context, each experiments has 5 queries
-    lengths = [8192, 16384, 24576]
-    experiments = [CreateDummyExperiment(10, length) for length in lengths]
+    lengths = [32000]
+    experiments = [CreateDummyExperiment(10, length, gap_between_requests=1.5) for length in lengths]
 
     test_case = TestCase(
             experiments = experiments,
-            engines = [config1, config2])
+            engines = [config1])
 
     # Run test case
     final_result = run_test_case(test_case)

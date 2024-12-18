@@ -10,6 +10,7 @@ class Request:
     timestamp: float
     context: str
     question: str
+    max_tokens: int
 
 class WorkloadGenerator(metaclass=abc.ABCMeta):
     def __init__(self, config: WorkloadConfig):
@@ -50,7 +51,7 @@ class DumbWorkloadGenerator(WorkloadGenerator):
     def generate_question(self, index: int) -> str:
         if self.config.query_length - self.estimated_num_tokens_question > 0:
             question_prefix = self.dummy_context * ((self.config.query_length - self.estimated_num_tokens_question) // self.estimated_num_tokens_context)
-        return f"Index {index}. {question_prefix} Question: How are you doing today?"
+        return f"Index {index}. {question_prefix} Question: tell me a story. Please generate 1000 words.  "
 
     def generate(self) -> List[Request]:
         num_requests = int(self.config.duration * self.config.qps)
@@ -58,11 +59,22 @@ class DumbWorkloadGenerator(WorkloadGenerator):
         ret = []
         for i in range(num_requests):
             timestamp = i / self.config.qps + self.config.offset
-            ret.append(Request(
-                timestamp=timestamp,
-                context=self.generate_context(),
-                question=self.generate_question(i)
-            ))
+            if i >= 1:
+                timestamp += 5
+            if i == 0:
+                ret.append(Request(
+                    timestamp=timestamp,
+                    context=self.generate_context(),
+                    question=self.generate_question(i),
+                    max_tokens=10
+                ))
+            else:
+                ret.append(Request(
+                    timestamp=timestamp,
+                    context=self.generate_context(),
+                    question=self.generate_question(i),
+                    max_tokens=(10-i + 1) * 10
+                ))
 
         return ret
     
@@ -97,11 +109,20 @@ class VaryLengthWorkloadGenerator(WorkloadGenerator):
         ret = []
         for i in range(num_requests):
             timestamp = i / self.config.qps + self.config.offset
-            ret.append(Request(
-                timestamp=timestamp,
-                context=self.generate_context(),
-                question=self.generate_question(i)
-            ))
+            if i == 0:
+                ret.append(Request(
+                    timestamp=timestamp,
+                    context=self.generate_context(),
+                    question=self.generate_question(i),
+                    max_tokens=10
+                ))
+            else:
+                ret.append(Request(
+                    timestamp=timestamp,
+                    context=self.generate_context(),
+                    question=self.generate_question(i),
+                    max_tokens=(10-i + 1) * 10
+                ))
 
         return ret
     
