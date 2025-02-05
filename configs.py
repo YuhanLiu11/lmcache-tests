@@ -32,10 +32,10 @@ class WorkloadConfig(Config):
     - Query length
     """
     # Number of queries per second
-    qps: int
+    num_requests: int
 
+    lam: float
     # Total duration of the workload in seconds 
-    duration: float
 
     # Number of tokens in the context (approximate number)
     context_length: int

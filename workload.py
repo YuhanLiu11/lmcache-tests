@@ -4,7 +4,7 @@ from typing import List
 
 from configs import WorkloadConfig, Usecase
 import utils
-
+import numpy as np
 @dataclass
 class Request:
     timestamp: float
@@ -42,6 +42,8 @@ class DumbWorkloadGenerator(WorkloadGenerator):
         dummy_question = "Index 0. Question: How are you doing today?"
         self.estimated_num_tokens_question = utils.estimate_num_tokens(dummy_question)
         self.max_context_length = max_context_length
+        np.random.seed(42)
+        self.poisson_data = sorted(np.random.poisson(self.config.lam, self.config.num_requests))
 
     def generate_context(self) -> str:
         context_length = min(self.max_context_length - self.config.query_length, self.config.context_length)
@@ -53,11 +55,10 @@ class DumbWorkloadGenerator(WorkloadGenerator):
         return f"Index {index}. {question_prefix} Question: How are you doing today?"
 
     def generate(self) -> List[Request]:
-        num_requests = int(self.config.duration * self.config.qps)
-        
+        num_requests = self.config.num_requests 
         ret = []
         for i in range(num_requests):
-            timestamp = i / self.config.qps + self.config.offset
+            timestamp = self.poisson_data[i] 
             ret.append(Request(
                 timestamp=timestamp,
                 context=self.generate_context(),

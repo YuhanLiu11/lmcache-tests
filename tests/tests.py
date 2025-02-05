@@ -30,14 +30,14 @@ def CreateSingleLocalBootstrapConfig(
         envs = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     )
 
-def CreateDummyExperiment(num_requests, context_length, gap_between_requests = 8):
+def CreateDummyExperiment(num_requests, lam, context_length, gap_between_requests = 8):
     """
     Create some requests for DUMMY usecase
     The query length will be 16
     """
     qps = 1 / gap_between_requests
     duration = num_requests * gap_between_requests
-    cfg = WorkloadConfig(qps, duration, context_length, 16, offset = 0)
+    cfg = WorkloadConfig(num_requests, lam, context_length, 16, offset = 0)
     return (cfg, Usecase.DUMMY)
 
 def CreateMultiTurnExperiment(num_requests, context_length, gap_between_requests = 8):
@@ -249,19 +249,17 @@ def test_local_cpu_experimental(model = "mistralai/Mistral-7B-Instruct-v0.2", po
     # Start two servers: with lmcache and without lmcache
     os.environ["LMCACHE_USE_EXPERIMENTAL"] = "True"
     config1 = CreateSingleLocalBootstrapConfig(port1, 0, model, "configs/experimental.yaml")
-    config2 = CreateSingleLocalBootstrapConfig(port2, 1, model, None)
 
     # Set vllm configuration for different models
     ModelConfig(model, config1)
-    ModelConfig(model, config2)
 
     # Experiments: 8K, 16K, 24K shared context, each experiments has 10 queries
-    lengths = [8192, 16384, 24576]
-    experiments = [CreateDummyExperiment(10, length ) for length in lengths]
+    lengths = [32000]
+    experiments = [CreateDummyExperiment(1, 5, length ) for length in lengths]
 
     test_case = TestCase(
             experiments = experiments,
-            engines = [config1, config2])
+            engines = [config1])
 
     # Run test case
     final_result = run_test_case(test_case)

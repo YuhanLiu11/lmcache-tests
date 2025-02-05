@@ -323,19 +323,19 @@ def run_experiment(
 
 
     # Start the serving engine
-    bootstrappers = []
-    for config in engine_configs:
-        bootstrappers.append(CreateBootstrapper(config))
-        bootstrappers[-1].start()
+    # bootstrappers = []
+    # for config in engine_configs:
+    #     bootstrappers.append(CreateBootstrapper(config))
+    #     bootstrappers[-1].start()
 
     try:
         # Wait for the engines to be ready
-        for bootstrapper in bootstrappers:
-            ready = bootstrapper.wait_until_ready(timeout = 300)
-            if not ready:
-                logger.error(f"Engine {bootstrapper} is not ready")
-                cleanup(bootstrappers)
-                return
+        # for bootstrapper in bootstrappers:
+        #     ready = bootstrapper.wait_until_ready(timeout = 300)
+        #     if not ready:
+        #         logger.error(f"Engine {bootstrapper} is not ready")
+        #         cleanup(bootstrappers)
+        #         return
 
         # Create the clients
         clients = [create_openai_client(config.vllm_config.port, config.vllm_config.model) for config in engine_configs]
@@ -353,12 +353,12 @@ def run_experiment(
 
     except Exception as e:
         logger.error(f"Experiment failed: {e}")
-        cleanup(bootstrappers)
+        # cleanup(bootstrappers)
         return None
 
-    finally:
-        # Cleanup
-        cleanup(bootstrappers)
+    # finally:
+    #     # Cleanup
+    #     cleanup(bootstrappers)
 
     return results, gpu_usage
 

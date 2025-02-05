@@ -22,178 +22,50 @@ conda activate lmcache
 # Clone github repository
 git clone git@github.com:LMCache/lmcache-tests.git
 cd lmcache-tests
+pip install vllm==0.7.0
+git clone https://github.com/LMCache/LMCache.git
+cd LMCache 
+pip install -e .
+cd ..
+git clone https://github.com/LMCache/lmcache-vllm.git
+cd lmcache-vllm 
+pip install -e . 
+# Now copy LMCache/docker/patch/factory.py and LMCache/docker/patch/lmcache_connector.py to <PATH TO VLLM>/vllm/distributed/kv_transfer/kv_connector/
+# For example, for me
+cd ..
+cp LMCache/docker/patch/factory.py ~/.local/miniconda3/envs/lmcache/lib/python3.10/site-packages/vllm/distributed/kv_transfer/kv_connector/
+cp LMCache/docker/patch/lmcache_connector.py ~/.local/miniconda3/envs/lmcache/lib/python3.10/site-packages/vllm/distributed/kv_transfer/kv_connector/
 
-# Run the installation script
-bash prepare_environment.sh
 ```
 
 ## 2. Run the tests
 
 ### 2.1 Quickstart example
 
-The following command line runs the test `test_lmcache_local_cpu` defined in `tests/tests.py` and write the output results to the output folder (`outputs/test_lmcache_local_cpu.csv`).
+First start LMCache server:
 
-```bash
-python3 main.py tests/tests.py -f test_lmcache_local_cpu -o outputs/
+```
+python3 -m lmcache.experimental.server localhost 65433 cpu 
 ```
 
-To process the result, please run
-```bash
-cd outputs/
-python3 process_result.py
+and start vllm server:
 ```
-Then, a pdf file `test_lmcache_local_cpu.pdf` will be created.
-
-You can also monitor the following files to check the status of the bootstrapped vllm process.
-
-For stderr:
-```bash
-tail -f /tmp/{user_name}-8000-stderr.log
-```
-
-For stdout:
-```bash
-tail -f /tmp/{user_name}-8000-stdout.log
+LMCACHE_USE_EXPERIMENTAL=True \
+LMCACHE_CHUNK_SIZE=256 \
+LMCACHE_LOCAL_CPU=False \
+LMCACHE_REMOTE_URL=lm://localhost:65433 \
+LMCACHE_REMOTE_SERDE=cachegen \
+VLLM_ATTENTION_BACKEND=FLASH_ATTN \
+vllm serve mistralai/Mistral-7B-Instruct-v0.2 --kv-transfer-config \
+    '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}' \
+    --port 8000 \
+    --enforce-eager \
+    --enable-chunked-prefill false --disable-log-requests
 ```
 
 
-### 2.2 Usage of main.py
+And then run the following code by:
 
-`main.py` is the entrypoint to execute the test functions:
 ```
-usage: main.py [-h] [-f FILTER] [-l] [-o OUTPUT_DIR] [-m MODEL] [-p PORT1 PORT2] filepath
-
-Execute all functions in a given Python file.
-
-positional arguments:
-  filepath                                  The Python file to execute functions from (include subfolders if any).
-
-options:
-  -h, --help                                show this help message and exit
-  -f FILTER, --filter FILTER                Pattern to filter which functions to execute.
-  -l, --list                                List all functions in the module without executing them.
-  -o OUTPUT_DIR, --output-dir OUTPUT_DIR    The directory to put the output file.
-  -m MODEL, --model MODEL                   The models of vllm for every functions.
-  -p PORT1 PORT2, --ports PORT1 PORT2       Two ports required for the experiment.
+VLLM_ATTENTION_BACKEND=FLASH_ATTN python3 main.py tests/tests.py -f test_local_cpu_experimental -o outputs/
 ```
-
-Here are some examples:
-
-```bash
-# Run all the test functions defined in 'tests/tests.py' and save the output to 'outputs/'
-python3 main.py tests/tests.py -o outputs/
-
-# List the tests in 'tests/tests.py'
-python3 main.py tests/tests.py -l
-
-# Run some specific tests that match the given pattern (e.g., containing 'cachegen')
-python3 main.py tests/tests.py -f cachegen
-
-# Run all the test functions defined in 'tests/tests.py' with llama
-python3 main.py tests/tests.py -m "meta-llama/Llama-3.1-8B-Instruct"
-```
-
-### 2.3 Output parsing
-
-In general, each test function should output the results as a csv file, where the file name is the same as function name but with a `csv` suffix.
-There should be multiple columns in the CSV:
-- `expr_id`: the id of the experiment
-- `timestamp`: the timestamp of the request in the workload
-- `engine_id`: the id of the serving engine instance to which the request is sent
-- `request_id`: the id of the request in the workload
-- `TTFT`: the time-to-first-token of this request
-- `throughput`: the number of output tokens per second of this request
-- `latency`: the time the whole response completes
-- `context_len`: the context length of this request
-- `query_len`: the query length of this request
-- `gpu_memory`: the gpu memory used before this experiment is finished
-
-Some example codes of how to parse the output CSV can be found in `outputs/process_result.py`.
-
-## 3. An explanation of the current tests
-There are various test functions available that can be specified using -f / --filter. These functions serve the following purposes:
-
-* Local cpu storage backend
-  * `test_lmcache_local_cpu`: compares scenarios with and without lmcache.
-  * `test_multi_turn`: tests the performance of saving decode KV Cache with a multi-turn conversation.
-  * `test_vary_length_workload`: tests the performance of partial prefill by changing the workload length of different requests.
-  * `test_chunk_prefill`: tests the performance of chunked prefill.
-  * `test_cache_compatibility`: tests the compatibility of prefix caching between lmcache and vllm.
-  * `test_lmcache_local_distributed`: tests the performance of tensor parallelism.
-  * `test_local_cpu_experimental`: tests the codes in `LMCache/lmcache/experimental/`.
-* Remote cpu storage backend
-  * `test_lmcache_remote_cachegen`: compares scenarios whether retrieval is pipelined or not with cachegen for transmission.
-  * `test_lmcache_cachegen_distributed`: tests the performance of tensor parallelism with cachegen for transmission.
-  * `test_lmcache_remote_safetensor`: compares scenarios whether retrieval is pipelined or not with safetensor for transmission.
-  * `test_lmcache_safetensor_distributed`: tests the performance of tensor parallelism with safetensor for transmission.
-* Other storage backend
-  * `test_lmcache_local_gpu`: local gpu storage backend.
-  * `test_lmcache_local_disk`: local disk storage backend.
-  * `test_local_disk_experimental`: tests the codes in `LMCache/lmcache/experimental/` with local disk storage backend.
-  * `test_lmcache_remote_disk`: remote disk storage backend.
-  * `test_lmcache_redis_sentinel`: Redis instance storage backend. 
-* Offline tests
-  * `offline_test`: tests partial prefll and full prefill in a single batch.
-
-## 4. Contributing guide: understanding the code
-
-### 4.1 Basic terminology
-
-- **`Request`**: A request is a single prompt containing some context and a user query.
-- **`Engine`**: Means "serving engine". An engine is an LLM serving engine process that can process requests through the OpenAI API interface.
-- **`Workload`**: A workload is a list of requests at different timestamps. Usually, a workload is associated with only one engine.
-- **`Experiment`**: An experiment runs multiple engines simultaneously and sends the workloads generated from the _same_ configuration to the serving engines.
-- **`Test case`**: A test case contains a list of experiments. The goal is to compare the performance of different engines under different workloads. 
-- **`Test function`**: A test function wraps the test cases and saves the output CSV. In most cases, a single test function only contains one test case. Different test functions aim to test different functionalities of the system.
-
-### 4.2 Main components
-
-**Test case configuration**:
-
-Test case configuration controls the experiments to run. The configuration-related code can be found in [config.py](https://github.com/LMCache/lmcache-tests/blob/main/configs.py).
-
-Currently, we support the following configurations:
-- **Workload configuration**: Specifies the QPS, context length, query length, and total duration of the workload.
-- **vLLM configuration**: Controls the command line arguments used to start vLLM.
-- **LMCache configuration**: Points to a LMCache configuration file.
-
-During the experiment, workload configuration will be used to generate the workloads, and vLLM configuration + LMCache configuration will be used to start the engine.
-
-**Workload generator**:
-
-The workload generator takes in a workload configuration and generates the workload (*i.e.*, a list of requests at different timestamps) as the output.
-The code for the workload generator can be found in [workload.py](https://github.com/LMCache/lmcache-tests/blob/main/workload.py).
-
-By design, there could be multiple different kinds of workload generators for different use cases, such as chatbot, QA, or RAG. 
-The class `Usecase` is used to specify which workload generator to create during runtime. 
-Currently, we only support a `DUMMY` use case where the requests in the generated workload only contain dummy texts and questions.
-
-The workload generator, once initialized with a configuration, only provides a single method: `generate(self) -> Workload`.
-
-**Engine bootstrapper**:
-
-The engine bootstrapper pulls up the serving engine based on the configurations (vLLM configuration + LMCache configuration).
-Currently, we only support starting vLLM (with or without LMCache) from the terminal. We will support docker-based engines in the future.
-The code can be found in [bootstrapper.py](https://github.com/LMCache/lmcache-tests/blob/main/bootstrapper.py)
-
-The engine bootstrapper supports the following methods:
-- `start(self)`: Non-blocking function to start the serving engine.
-- `wait_until_ready(self, timeout=60) -> bool`: Block until the serving engine is ready or it's dead or timeout is reached. Returns true if it's ready, otherwise false.
-- `is_healthy(self) -> bool`: Non-block function to check if the engine is alive or not.
-- `close(self)`: blocking function to shutdown the serving engine
-
-**Experiment runner**:
-
-The experiment runner takes in _one_ workload config and $N$ engine configs as input. It does the following things:
-- Create the $N$ workload generators from the workload config.
-- Generate $N$ workloads.
-- Bootstrap all the serving engines. (This requires that the engine config is correct in a way that multiple serving engines can run at the same time).
-- Send the requests at the given timestamps to the engines.
-- Collect the TTFT, throughput, and the GPU memory usage.
-- Return the results in a pandas dataframe.
-
-The code can be found in [driver.py](https://github.com/LMCache/lmcache-tests/blob/main/driver.py)
-
-## 5. Contributing guide: adding new tests
-
-(WIP)
