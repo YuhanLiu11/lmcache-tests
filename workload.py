@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import abc
 from typing import List
-
+import os
 from configs import WorkloadConfig, Usecase
 import utils
 import numpy as np
@@ -43,7 +43,17 @@ class DumbWorkloadGenerator(WorkloadGenerator):
         self.estimated_num_tokens_question = utils.estimate_num_tokens(dummy_question)
         self.max_context_length = max_context_length
         np.random.seed(42)
-        self.poisson_data = sorted(np.random.poisson(self.config.lam, self.config.num_requests))
+        self.exp_data = np.random.exponential(float(1/float(os.environ['QPS'])), self.config.num_requests)
+        
+        # self.poisson_data = sorted(np.random.poisson(self.config.lam, self.config.num_requests))
+        self.all_prompts = []
+        # read jsonl file
+        import json
+        # Open the JSONL file and read line by line
+        with open("LongBench/LongBench/narrativeqa.jsonl", "r", encoding="utf-8") as file:
+            for line in file:
+                data = json.loads(line)  # Parse the JSON object
+                self.all_prompts.append(data["prompt"])
 
     def generate_context(self) -> str:
         context_length = min(self.max_context_length - self.config.query_length, self.config.context_length)
@@ -57,14 +67,18 @@ class DumbWorkloadGenerator(WorkloadGenerator):
     def generate(self) -> List[Request]:
         num_requests = self.config.num_requests 
         ret = []
+        t = 0
+        ts = []
         for i in range(num_requests):
-            timestamp = self.poisson_data[i] 
+            timestamp = t + self.exp_data[i]
+            t = timestamp
+            ts.append(timestamp)
             ret.append(Request(
                 timestamp=timestamp,
-                context=self.generate_context(),
+                context=self.all_prompts[i],
                 question=self.generate_question(i)
             ))
-
+        breakpoint()
         return ret
     
 class VaryLengthWorkloadGenerator(WorkloadGenerator):
@@ -90,7 +104,7 @@ class VaryLengthWorkloadGenerator(WorkloadGenerator):
     def generate_question(self, index: int) -> str:
         if self.config.query_length - self.estimated_num_tokens_question > 0:
             question_prefix = self.dummy_context * ((self.config.query_length - self.estimated_num_tokens_question) // self.estimated_num_tokens_context)
-        return f"Index {index}. {question_prefix} Question: How are you doing today?"
+        return f""
 
     def generate(self) -> List[Request]:
         num_requests = int(self.config.duration * self.config.qps)
@@ -98,6 +112,7 @@ class VaryLengthWorkloadGenerator(WorkloadGenerator):
         ret = []
         for i in range(num_requests):
             timestamp = i / self.config.qps + self.config.offset
+            
             ret.append(Request(
                 timestamp=timestamp,
                 context=self.generate_context(),

@@ -255,7 +255,7 @@ def test_local_cpu_experimental(model = "mistralai/Mistral-7B-Instruct-v0.2", po
 
     # Experiments: 8K, 16K, 24K shared context, each experiments has 10 queries
     lengths = [32000]
-    experiments = [CreateDummyExperiment(1, 5, length ) for length in lengths]
+    experiments = [CreateDummyExperiment(50, 5, length ) for length in lengths]
 
     test_case = TestCase(
             experiments = experiments,
